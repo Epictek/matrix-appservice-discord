@@ -69,7 +69,7 @@ function generateRegistration(opts, registrationPath: string): void {
         url: opts.url,
         /* eslint-enable @typescript-eslint/camelcase */
     } as IAppserviceRegistration;
-    fs.writeFileSync(registrationPath, yaml.safeDump(reg));
+    fs.writeFileSync(registrationPath, yaml.dump(reg));
 }
 
 function setupLogging(): void {
@@ -93,13 +93,10 @@ function setupLogging(): void {
     };
 
     LogService.setLogger({
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        trace: (mod: string, args: any[]) => logFunc("verysilly", mod, args),
         debug: (mod: string, args: any[]) => logFunc("silly", mod, args),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         error: (mod: string, args: any[]) => logFunc("error", mod, args),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         info: (mod: string, args: any[]) => logFunc("info", mod, args),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         warn: (mod: string, args: any[]) => logFunc("warn", mod, args),
     });
 }
@@ -132,11 +129,11 @@ async function run(): Promise<void> {
     }
 
     const config = new DiscordBridgeConfig();
-    const readConfig = yaml.safeLoad(fs.readFileSync(configPath, "utf8"));
+    const readConfig = yaml.load(fs.readFileSync(configPath, "utf8"));
     if (typeof readConfig !== "object") {
         throw Error("Config is not of type object");
     }
-    config.applyConfig(readConfig);
+    config.applyConfig(readConfig as object);
     config.applyEnvironmentOverrides(process.env);
     Log.Configure(config.logging);
     const port = opts.port || config.bridge.port;
@@ -149,7 +146,7 @@ async function run(): Promise<void> {
                   "https://github.com/Half-Shot/matrix-appservice-discord/");
         throw Error("Bridge has legacy configuration options and is unable to start");
     }
-    const registration = yaml.safeLoad(fs.readFileSync(registrationPath, "utf8")) as IAppserviceRegistration;
+    const registration = yaml.load(fs.readFileSync(registrationPath, "utf8")) as IAppserviceRegistration;
     setupLogging();
 
     const store = new DiscordStore(config.database);
