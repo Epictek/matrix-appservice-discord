@@ -40,7 +40,8 @@ export class DiscordClientFactory {
         // We just need to make sure we have a bearer token.
         // Create a new Bot client.
         this.botClient = new DiscordClient({
-            intents: this.config.usePrivilegedIntents ? [Intents.FLAGS.GUILDS] : []
+            messageCacheLifetime: 5,
+            intents: this.config.usePrivilegedIntents ? [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES, Intents.FLAGS.GUILD_MEMBERS, Intents.FLAGS.GUILD_PRESENCES, Intents.FLAGS.GUILD_MESSAGE_TYPING, Intents.FLAGS.GUILD_MESSAGE_REACTIONS] : []
         });
 
         const waitPromise = new Promise((resolve, reject) => {
