@@ -108,11 +108,8 @@ export class ChannelSyncroniser {
                 }
             } 
 
-         await this.bridge.botClient.sendMessage(room,sendContent);
+         await this.bridge.botClient.sendMessage(room, sendContent);
         }
-
-
-       
     }
 
     public async OnGuildUpdate(guild: Discord.Guild, force = false) {
@@ -157,7 +154,7 @@ export class ChannelSyncroniser {
     }
 
     public async OnDelete(channel: Discord.Channel) {
-        if (channel.type !== "GUILD_TEXT") {
+        if (channel.type !== "GUILD_TEXT" && !channel.isThread()) {
             log.info(`Channel ${channel.id} was deleted but isn't a text channel, so ignoring.`);
             return;
         }
@@ -165,7 +162,7 @@ export class ChannelSyncroniser {
         let roomids;
         let entries: IRoomStoreEntry[];
         try {
-            roomids = await this.GetRoomIdsFromChannel(channel as Discord.TextChannel);
+            roomids = await this.GetRoomIdsFromChannel(channel as Discord.TextBasedChannels);
             entries = await this.roomStore.getEntriesByMatrixIds(roomids);
         } catch (e) {
             log.warn(`Couldn't find roomids for deleted channel ${channel.id}`);
@@ -173,7 +170,7 @@ export class ChannelSyncroniser {
         }
         for (const roomid of roomids) {
             try {
-                await this.handleChannelDeletionForRoom(channel as Discord.TextChannel, roomid, entries[roomid][0]);
+                await this.handleChannelDeletionForRoom(channel as Discord.TextBasedChannels, roomid, entries[roomid][0]);
             } catch (e) {
                 log.error(`Failed to delete channel from room: ${e}`);
             }
@@ -375,7 +372,7 @@ export class ChannelSyncroniser {
     }
 
     private async handleChannelDeletionForRoom(
-        channel: Discord.TextChannel,
+        channel: Discord.TextBasedChannels,
         roomId: string,
         entry: IRoomStoreEntry,
         overrideOptions?: DiscordBridgeConfigChannelDeleteOptions): Promise<void> {
@@ -384,10 +381,16 @@ export class ChannelSyncroniser {
         const client = this.bridge.botClient;
         const options = overrideOptions || this.config.channel.deleteOptions;
         const plumbed = entry.remote!.get("plumbed");
-
+        
         await this.roomStore.upsertEntry(entry);
         if (options.ghostsLeave) {
-            for (const member of channel.members.values()) {
+            var members;
+            if (channel.isThread()){
+                members = await channel.members.fetch();
+            } else if (channel.type === "GUILD_TEXT") {
+                members = await channel.members.values();
+            }
+            for (const member of members) {
                 try {
                     const mIntent = this.bot.GetIntentFromDiscordMember(member);
                     await client.leaveRoom(roomId);
