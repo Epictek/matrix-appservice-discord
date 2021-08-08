@@ -21,6 +21,8 @@ import { DiscordBridgeConfig, DiscordBridgeConfigChannelDeleteOptions } from "./
 import { Log } from "./log";
 import { DbRoomStore, IRoomStoreEntry } from "./db/roomstore";
 import { Appservice } from "matrix-bot-sdk";
+import { DiscordStore } from "./store";
+import { DbEvent } from "./db/dbdataevent";
 
 const log = new Log("ChannelSync");
 
@@ -62,6 +64,7 @@ export class ChannelSyncroniser {
         private config: DiscordBridgeConfig,
         private bot: DiscordBot,
         private roomStore: DbRoomStore,
+        private store: DiscordStore,
     ) {
 
     }
@@ -80,19 +83,36 @@ export class ChannelSyncroniser {
 
     public async OnThreadCreate(thread: Discord.ThreadChannel) {
         log.verbose(`Thread created ${thread.id} parent: ${thread.parentId}`);
-
         var rooms = await this.GetRoomIdsFromChannel(thread.parent as Discord.TextChannel);
 
         for (const room of rooms) {
-         await this.bridge.botClient.sendMessage(room, {
-             /* eslint-disable @typescript-eslint/camelcase */
-             body: `#_discord_${thread.guild.id}_${thread.id}:${this.config.bridge.domain}`,
-             format: "org.matrix.custom.html",
-             formatted_body: `#_discord_${thread.guild.id}_${thread.id}:${this.config.bridge.domain}`,
-             msgtype: "m.notice",
-             /* eslint-enable @typescript-eslint/camelcase */
-         });
+
+            var sendContent = {
+                body: `Thread: #_discord_${thread.guild.id}_${thread.id}:${this.config.bridge.domain}`,
+                format: "org.matrix.custom.html",
+                formatted_body: `Thread: #_discord_${thread.guild.id}_${thread.id}:${this.config.bridge.domain}`,
+                msgtype: "m.notice",
+            }
+
+            var message = await thread.messages.fetch();
+            const storeEvent = await this.store.Get(DbEvent, {discord_id: message.first()?.reference?.messageId})
+            if (storeEvent && storeEvent.Result)
+            {
+                while(storeEvent.Next())
+                {
+                    sendContent["m.relates_to"] = {
+                        "m.in_reply_to": {
+                            event_id: storeEvent.MatrixId.split(";")[0]
+                        }
+                    };
+                }
+            } 
+
+         await this.bridge.botClient.sendMessage(room,sendContent);
         }
+
+
+       
     }
 
     public async OnGuildUpdate(guild: Discord.Guild, force = false) {

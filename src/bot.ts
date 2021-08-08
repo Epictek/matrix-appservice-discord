@@ -95,7 +95,7 @@ export class DiscordBot {
         this.discordMsgProcessor = new DiscordMessageProcessor(config.bridge.domain, this);
         this.presenceHandler = new PresenceHandler(this);
         this.roomHandler = new MatrixRoomHandler(this, config, bridge, store.roomStore);
-        this.channelSync = new ChannelSyncroniser(bridge, config, this, store.roomStore);
+        this.channelSync = new ChannelSyncroniser(bridge, config, this, store.roomStore, store);
         this.provisioner = new Provisioner(store.roomStore, this.channelSync);
         this.mxEventProcessor = new MatrixEventProcessor(
             new MatrixEventProcessorOpts(config, bridge, this, store),
@@ -988,6 +988,20 @@ export class DiscordBot {
                     formatted_body: result.formattedBody,
                     msgtype: result.msgtype,
                 };
+                if (msg.reference) {
+                    const storeEvent = await this.store.Get(DbEvent, {discord_id: msg.reference?.messageId})
+                    if (storeEvent && storeEvent.Result)
+                    {
+                        while(storeEvent.Next())
+                        {
+                            sendContent["m.relates_to"] = {
+                                "m.in_reply_to": {
+                                    event_id: storeEvent.MatrixId.split(";")[0]
+                                }
+                            };
+                        }
+                    }
+                }
                 if (editEventId) {
                     sendContent.body = `* ${result.body}`;
                     sendContent.formatted_body = `* ${result.formattedBody}`;
