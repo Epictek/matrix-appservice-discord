@@ -67,7 +67,7 @@ export class ChannelSyncroniser {
     }
 
     public async OnUpdate(channel: Discord.Channel) {
-        if (channel.type !== "GUILD_TEXT") {
+        if (channel.type !== "GUILD_TEXT" && channel.type !== "GUILD_PUBLIC_THREAD") {
             return; // Not supported for now
         }
         const channelState = await this.GetChannelUpdateState(channel as Discord.TextChannel);
@@ -75,6 +75,23 @@ export class ChannelSyncroniser {
             await this.ApplyStateToChannel(channelState);
         } catch (e) {
             log.error("Failed to update channels", e);
+        }
+    }
+
+    public async OnThreadCreate(thread: Discord.ThreadChannel) {
+        log.verbose(`Thread created ${thread.id} parent: ${thread.parentId}`);
+
+        var rooms = await this.GetRoomIdsFromChannel(thread.parent as Discord.TextChannel);
+
+        for (const room of rooms) {
+         await this.bridge.botClient.sendMessage(room, {
+             /* eslint-disable @typescript-eslint/camelcase */
+             body: `#_discord_${thread.guild.id}_${thread.id}:${this.config.bridge.domain}`,
+             format: "org.matrix.custom.html",
+             formatted_body: `#_discord_${thread.guild.id}_${thread.id}:${this.config.bridge.domain}`,
+             msgtype: "m.notice",
+             /* eslint-enable @typescript-eslint/camelcase */
+         });
         }
     }
 

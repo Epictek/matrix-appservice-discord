@@ -36,10 +36,10 @@
   },
   "homepage": "https://github.com/Half-Shot/matrix-appservice-discord#readme",
   "dependencies": {
-    "discord.js": "github:discordjs/discord.js",
     "better-sqlite3": "^7.4.3",
     "command-line-args": "^5.2.0",
     "command-line-usage": "^6.1.1",
+    "discord.js": "^13.0.0",
     "escape-html": "^1.0.3",
     "escape-string-regexp": "^5.0.0",
     "js-yaml": "^4.1.0",

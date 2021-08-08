@@ -249,7 +249,7 @@ export class DiscordBot {
                 log.error("Exception thrown while handling \"messageUpdate\" event", err);
             }
         });
-        client.on("message", async (msg: Discord.Message) => {
+        client.on("messageCreate", async (msg: Discord.Message) => {
             try {
                 log.verbose(`Got incoming msg i:${msg.id} c:${msg.channel.id} g:${msg.guild?.id}`);
                 MetricPeg.get.registerRequest(msg.id);
@@ -305,6 +305,15 @@ export class DiscordBot {
                 }
                 await this.userSync.OnUpdateGuildMember(member);
             } catch (err) { log.error("Exception thrown while handling \"guildMemberUpdate\" event", err); }
+        });
+        client.on("threadCreate", async (thread) => {
+            try {
+                if (thread.partial) {
+                    log.warn(`Ignoring update for ${thread.guild.id} ${thread.id}. User was partial.`);
+                    return;
+                }
+                await this.channelSync.OnThreadCreate(thread);
+            } catch (err) { log.error("Exception thrown while handling \"threadCreate\" event", err); }
         });
         client.on("debug", (msg) => { jsLog.verbose(msg); });
         client.on("error", (msg) => { jsLog.error(msg); });
@@ -367,12 +376,13 @@ export class DiscordBot {
         const hasSender = sender !== null && sender !== undefined;
         try {
             const client = await this.clientFactory.getClient(sender);
-            const guild = client.guilds.resolve(server);
+            const guild = client.guilds.cache.get(server);
             if (!guild) {
                 throw new Error(`Guild "${server}" not found`);
             }
-            const channel = guild.channels.resolve(room);
-            if (channel && channel.type === "GUILD_TEXT") {
+            var channel = await guild.channels.fetch(room); 
+            
+            if (channel && (channel.type == "GUILD_TEXT" || channel?.isThread())) {
                 if (hasSender) {
                     const permissions = guild.me && channel.permissionsFor(guild.me);
                     if (!permissions || !permissions.has("VIEW_CHANNEL") || !permissions.has("SEND_MESSAGES")) {
@@ -497,13 +507,21 @@ export class DiscordBot {
 
         let msg: Discord.Message | null | (Discord.Message | null)[] = null;
         let hook: Discord.Webhook | undefined;
+        var threadChan : Discord.ThreadChannel | null = null;
+
         if (botUser) {
-            const webhooks = await chan.fetchWebhooks();
+            var hookChan = chan;
+            chan.id
+            if (chan.isThread()){
+                threadChan = chan as Discord.ThreadChannel;
+                hookChan = threadChan.parent as Discord.TextChannel;
+            }
+            const webhooks = await hookChan.fetchWebhooks();
             hook = webhooks.filter((h) => h.name === "_matrix").first();
             // Create a new webhook if none already exists
             try {
                 if (!hook) {
-                    hook = await chan.createWebhook(
+                    hook = await hookChan.createWebhook(
                         "_matrix",
                         {
                             avatar: MATRIX_ICON_URL,
@@ -515,6 +533,7 @@ export class DiscordBot {
                log.warn("Unable to create _matrix webook:", err);
             }
         }
+
         try {
             this.channelLock.set(chan.id);
             if (!roomLookup.canSendEmbeds) {
@@ -538,6 +557,7 @@ export class DiscordBot {
                      embeds,
                      files: opts.files,
                      username: embed!.author!.name,
+                     threadId: threadChan?.id
                  });
             } else {
                 opts.embeds?.push(this.prepareEmbedSetBot(embedSet));
