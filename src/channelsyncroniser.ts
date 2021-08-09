@@ -90,7 +90,7 @@ export class ChannelSyncroniser {
             var sendContent = {
                 body: `Thread: #_discord_${thread.guild.id}_${thread.id}:${this.config.bridge.domain}`,
                 format: "org.matrix.custom.html",
-                formatted_body: `Thread: #_discord_${thread.guild.id}_${thread.id}:${this.config.bridge.domain}`,
+                formatted_body: `Thread: <a href=\"https://matrix.to/#/#_discord_${thread.guild.id}_${thread.id}:${this.config.bridge.domain}\">${thread.guild.id}_${thread.id}:${this.config.bridge.domain}</a>`,
                 msgtype: "m.notice",
             }
 
