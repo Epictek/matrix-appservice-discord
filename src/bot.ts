@@ -519,6 +519,14 @@ export class DiscordBot {
         const webhooks = await chan.fetchWebhooks();
         hook = webhooks.filter((h) => h.name === "_matrix").first();
         // Create a new webhook if none already exists
+
+        var threadChan : Discord.ThreadChannel | null = null;
+        var hookChan = chan;
+        if (chan.isThread()){
+            threadChan = chan as Discord.ThreadChannel;
+            hookChan = threadChan.parent as Discord.TextChannel;
+        }
+
         try {
             if (!hook) {
                 hook = await chan.createWebhook(
@@ -998,6 +1006,44 @@ export class DiscordBot {
                 // on discord you can't edit in images, you can only edit text
                 // so it is safe to only check image upload stuff if we don't have
                 // an edit
+                Util.AsyncForEach(Array.from(msg.stickers.values()), async (sticker) => {
+                
+                    const content = await Util.DownloadFile(sticker.url);
+                    const fileMime = content.mimeType || mime.getType(sticker.name || "")
+                        || "application/octet-stream";
+                    const mxcUrl = await intent.underlyingClient.uploadContent(
+                        content.buffer,
+                        fileMime,
+                        sticker.name || "",
+                    );
+                    const type = fileMime.split("/")[0];
+                    let msgtype = "m.image";
+                    
+                    const info = {
+                        mimetype: fileMime
+                    } as IMatrixMediaInfo;
+
+                    await Util.AsyncForEach(rooms, async (room) => {
+                        const eventId = await intent.sendEvent(room, {
+                            body: sticker.name || "file",
+                            external_url: sticker.url,
+                            info,
+                            msgtype,
+                            url: mxcUrl,
+                        });
+                        this.lastEventIds[room] = eventId;
+                        const evt = new DbEvent();
+                        evt.MatrixId = `${eventId};${room}`;
+                        evt.DiscordId = msg.id;
+                        evt.ChannelId = msg.channel.id;
+                        if (msg.guild) {
+                            evt.GuildId = msg.guild.id;
+                        }
+                        await this.store.Insert(evt);
+                    });
+                });
+
+
                 await Util.AsyncForEach(Array.from(msg.attachments.values()), async (attachment) => {
                     const content = await Util.DownloadFile(attachment.url);
                     const fileMime = content.mimeType || mime.getType(attachment.name || "")
