@@ -83,10 +83,16 @@ export class ChannelSyncroniser {
 
     public async OnThreadCreate(thread: Discord.ThreadChannel) {
         log.verbose(`Thread created ${thread.id} parent: ${thread.parentId}`);
+        var owner =  await thread.fetchOwner();
         var rooms = await this.GetRoomIdsFromChannel(thread.parent as Discord.TextChannel);
 
-        for (const room of rooms) {
+        if(owner?.guildMember == null){
+            return;
+        }
 
+        const intent = this.bot.GetIntentFromDiscordMember(owner.guildMember);
+        for (const room of rooms) {
+            
             var sendContent = {
                 body: `Thread: #_discord_${thread.guild.id}_${thread.id}:${this.config.bridge.domain}`,
                 format: "org.matrix.custom.html",
@@ -107,8 +113,8 @@ export class ChannelSyncroniser {
                     };
                 }
             } 
-
-         await this.bridge.botClient.sendMessage(room, sendContent);
+         await intent.sendEvent(room, sendContent)
+         //await this.bridge.botClient.sendMessage(room, sendContent);
         }
     }
 
